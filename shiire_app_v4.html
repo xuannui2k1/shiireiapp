@@ -260,36 +260,60 @@ function switchTab(id) {
 }
 
 // ===== LOAD =====
-var allStoresFromSheet = []; // danh sách tất cả cửa hàng từ sheet
+var allStoresFromSheet = [];
 
 async function loadSheetData() {
   showLoading('読み込み中...');
   var sheetName = document.getElementById('sheet-name-el').textContent;
   try {
-    var url = GAS_URL + '?action=readAll&sheetId=' + encodeURIComponent(SHEET_ID) + '&sheetName=' + encodeURIComponent(sheetName);
-    var res = await fetch(url);
-    var json = await res.json();
-    if (json.error) { showToast('エラー: ' + json.error); hideLoading(); return; }
+    // Load song song: dữ liệu sheet + danh sách cá master
+    var [res1, res2] = await Promise.all([
+      fetch(GAS_URL + '?action=readAll&sheetId=' + encodeURIComponent(SHEET_ID) + '&sheetName=' + encodeURIComponent(sheetName)),
+      fetch(GAS_URL + '?action=readMaster')
+    ]);
+    var json1 = await res1.json();
+    var json2 = await res2.json();
 
-    sheetData = {};
-    var storeMap = {};
-    (json.rows || []).forEach(function(r) {
-      if (!sheetData[r.name]) sheetData[r.name] = [];
-      sheetData[r.name].push(r);
-      // Thu thập tất cả cửa hàng
-      var k = String(r.code) + '_' + r.store;
-      if (!storeMap[k]) storeMap[k] = { code: r.code, store: r.store };
-    });
+    if (json1.error) { showToast('エラー: ' + json1.error); hideLoading(); return; }
 
-    // Thêm cửa hàng từ allStores nếu GAS trả về stores riêng
-    if (json.stores) {
-      json.stores.forEach(function(s) {
-        var k = String(s.code) + '_' + s.store;
-        if (!storeMap[k]) storeMap[k] = { code: s.code, store: s.store };
+    // Cập nhật danh sách cá từ master
+    if (json2.fishList && json2.fishList.length > 0) {
+      ALL_FISH_NAMES = json2.fishList.map(function(f) { return f.name; });
+      // Rebuild search index
+      FISH_SEARCH_INDEX = ALL_FISH_NAMES.map(function(name) {
+        var katakana = name.replace(/.*）/, '');
+        var hiragana = toHiragana(katakana);
+        return { name: name, katakana: katakana.toLowerCase(), hiragana: hiragana };
       });
     }
 
-    allStoresFromSheet = Object.values(storeMap).sort(function(a, b) { return a.code - b.code; });
+    sheetData = {};
+    var storeMap = {};
+    (json1.rows || []).forEach(function(r) {
+      if (!sheetData[r.name]) sheetData[r.name] = [];
+      sheetData[r.name].push(r);
+      var k = String(r.code) + '_' + r.store;
+      if (r.code && r.store && !storeMap[k]) storeMap[k] = { code: r.code, store: r.store };
+    });
+
+    if (json1.stores) {
+      json1.stores.forEach(function(s) {
+        var k = String(s.code) + '_' + s.store;
+        if (s.code && s.store && !storeMap[k]) storeMap[k] = { code: s.code, store: s.store };
+      });
+    }
+
+    allStoresFromSheet = Object.values(storeMap).sort(function(a, b) { return Number(a.code) - Number(b.code); });
+
+    // Thêm cửa hàng cố định
+    var fixedStores = [{ code: 7, store: '板付' }];
+    fixedStores.forEach(function(fs) {
+      var exists = allStoresFromSheet.some(function(s) {
+        return String(s.code) === String(fs.code) && s.store === fs.store;
+      });
+      if (!exists) allStoresFromSheet.push(fs);
+    });
+    allStoresFromSheet.sort(function(a, b) { return Number(a.code) - Number(b.code); });
 
     if (currentTab === 'add') renderAddScreen(); else renderList();
     showToast('読み込み完了');
