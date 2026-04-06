@@ -110,6 +110,18 @@ header p { font-size: 11px; opacity: 0.7; margin-top: 3px; }
 .popup-fish-item .pf-name { font-size: 14px; font-weight: 700; }
 .popup-fish-item .pf-info { font-size: 11px; color: #999; margin-top: 2px; }
 .btn-cancel { width: 100%; margin-top: 8px; padding: 12px; background: #f0f2f5; border: none; border-radius: 9px; font-size: 14px; font-weight: 700; font-family: inherit; cursor: pointer; }
+
+.btn-row { display: flex; gap: 8px; margin-top: 10px; }
+.btn-confirm { flex: 1; padding: 10px; background: #2e7d32; color: white; border: none; border-radius: 8px; font-size: 13px; font-weight: 700; font-family: inherit; cursor: pointer; }
+.btn-confirm:active { background: #1b5e20; }
+.btn-unlock { padding: 10px 14px; background: #f57c00; color: white; border: none; border-radius: 8px; font-size: 13px; font-weight: 700; font-family: inherit; cursor: pointer; }
+.btn-unlock:active { background: #e65100; }
+.btn-lock-all { width: 100%; padding: 10px; background: #1565c0; color: white; border: none; border-radius: 8px; font-size: 13px; font-weight: 700; font-family: inherit; cursor: pointer; margin-top: 8px; }
+.btn-lock-all:active { background: #0d47a1; }
+.store-row.locked { background: #f1f8e9; border-color: #aed581; }
+.store-row.locked .store-input-area input { background: #f9fbe7; color: #555; pointer-events: none; }
+.auto-save-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #4caf50; margin-left: 6px; opacity: 0; transition: opacity 0.3s; vertical-align: middle; }
+.auto-save-dot.show { opacity: 1; }
 </style>
 </head>
 <body>
@@ -163,6 +175,8 @@ var CATEGORIES = [
   { id: 'naka', label: '中）', prefix: '中）', items: ['中）ホタルイカ','中）殻付きホタテ'] },
   { id: 'ki',   label: '貴）', prefix: '貴）', items: ['貴）サワラ','貴）キンメダイ','貴）サヨリ','貴）サゴシ'] },
   { id: 'e',    label: 'え）', prefix: 'え）', items: ['え）マグロ'] },
+  { id: 'tachi',label: '立）', prefix: '立）', items: ['立）ヒラマサ'] },
+  { id: 'waka', label: '若）', prefix: '若）', items: ['若）天然タイ'] },
   { id: 'add',  label: '魚追加', prefix: null, items: [] }
 ];
 
@@ -190,7 +204,7 @@ var ALL_FISH_NAMES = [
 
 var GAS_URL = '', SHEET_ID = '', currentTab = 'maru';
 var sheetData = {};
-var extraItems = { maru: [], naka: [], ki: [], e: [] };
+var extraItems = { maru: [], naka: [], ki: [], e: [], tachi: [], waka: [] };
 var selectedStore = null, selectedFish = null;
 var allStores = [];
 
@@ -359,6 +373,7 @@ function renderFishCard(fishName, container) {
   var stores = sheetData[fishName] || [];
   var filledCount = stores.filter(function(s) { return s.qty !== null && s.qty !== ''; }).length;
   var hasFilled = filledCount > 0;
+  var fn = fishName.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
 
   var card = document.createElement('div');
   card.className = 'fish-card' + (hasFilled ? ' has-filled' : '');
@@ -376,30 +391,36 @@ function renderFishCard(fishName, container) {
       var hVal = s.price !== null ? s.price : '';
       var iVal = s.shiirePrice !== null ? s.shiirePrice : '';
       var key = makeKey(fishName, idx);
-      storesHTML += '<div class="store-row' + (isFilled ? ' filled' : '') + '" id="row_' + key + '">' +
-        '<div class="store-header">' +
-          '<span class="store-name-text">' + s.code + ' ' + s.store + '</span>' +
-          '<span class="store-badge ' + (isFilled ? 'badge-filled' : 'badge-empty') + '" id="badge_' + key + '">' + (isFilled ? '✓ 入力済' : '未入力') + '</span>' +
-        '</div>' +
-        '<div class="store-input-area" id="area_' + key + '">' +
-          '<div class="input-grid">' +
-            '<div class="field"><label>数量（F列）</label><input type="number" id="f_' + key + '" inputmode="decimal" value="' + fVal + '" placeholder="0"></div>' +
-            '<div class="field"><label>単価（H列）</label><input type="number" id="h_' + key + '" inputmode="decimal" value="' + hVal + '" placeholder="0"></div>' +
-            '<div class="field"><label>仕入単価（I列）</label><input type="number" id="i_' + key + '" inputmode="decimal" value="' + iVal + '" placeholder="0"></div>' +
+      storesHTML +=
+        '<div class="store-row' + (isFilled ? ' filled' : '') + '" id="row_' + key + '">' +
+          '<div class="store-header">' +
+            '<span class="store-name-text">' + s.code + ' ' + s.store + '</span>' +
+            '<span class="store-badge ' + (isFilled ? 'badge-filled' : 'badge-empty') + '" id="badge_' + key + '">' + (isFilled ? '✓ 入力済' : '未入力') + '</span>' +
           '</div>' +
-          '<button class="btn-save" id="sbtn_' + key + '" onclick="saveStore(' + idx + ',\'' + key + '\',\'' + fishName.replace(/\\/g,'\\\\').replace(/'/g,"\\'") + '\')">スプレッドシートに保存</button>' +
-          '<div class="save-msg" id="msg_' + key + '"></div>' +
-        '</div>' +
-      '</div>';
+          '<div class="store-input-area" id="area_' + key + '">' +
+            '<div class="input-grid">' +
+              '<div class="field"><label>数量（F列）<span class="auto-save-dot" id="dot_f_' + key + '"></span></label><input type="number" id="f_' + key + '" inputmode="decimal" value="' + fVal + '" placeholder="0" oninput="autoSave(' + idx + ',\'' + key + '\',\'' + fn + '\',\'f\')"></div>' +
+              '<div class="field"><label>単価（H列）<span class="auto-save-dot" id="dot_h_' + key + '"></span></label><input type="number" id="h_' + key + '" inputmode="decimal" value="' + hVal + '" placeholder="0" oninput="autoSave(' + idx + ',\'' + key + '\',\'' + fn + '\',\'h\')"></div>' +
+              '<div class="field"><label>仕入単価（I列）<span class="auto-save-dot" id="dot_i_' + key + '"></span></label><input type="number" id="i_' + key + '" inputmode="decimal" value="' + iVal + '" placeholder="0" oninput="autoSave(' + idx + ',\'' + key + '\',\'' + fn + '\',\'i\')"></div>' +
+            '</div>' +
+            '<div class="btn-row">' +
+              '<button class="btn-confirm" id="sbtn_' + key + '" onclick="confirmLock(' + idx + ',\'' + key + '\',\'' + fn + '\')">✓ 確認・ロック</button>' +
+              '<button class="btn-unlock" id="ubtn_' + key + '" onclick="unlock(\'' + key + '\')" style="display:none;">🔓 解除</button>' +
+            '</div>' +
+            '<div class="save-msg" id="msg_' + key + '"></div>' +
+          '</div>' +
+        '</div>';
     });
     storesHTML += '</div>';
+    // 全て確認・ロック ボタン
+    storesHTML += '<button class="btn-lock-all" onclick="lockAll(\'' + fn + '\')">🔒 ' + fishName + ' を全て確認・ロック</button>';
   }
 
   card.innerHTML =
     '<div class="fish-header" onclick="toggleCard(this)">' +
       '<div class="fish-info">' +
         '<div class="fish-name">' + fishName + '</div>' +
-        '<div class="fish-summary">' + summary + '</div>' +
+        '<div class="fish-summary" id="summary_' + makeKey(fishName,0).split('_')[0] + '">' + summary + '</div>' +
       '</div>' +
       '<span class="fish-arrow open">&#9660;</span>' +
     '</div>' +
@@ -416,39 +437,101 @@ function toggleCard(header) {
   if (arrow) arrow.classList.toggle('open', isOpen);
 }
 
-// ===== SAVE STORE =====
-async function saveStore(idx, key, fishName) {
-  var storeData = (sheetData[fishName] || [])[idx];
-  if (!storeData) { showToast('データなし'); return; }
-  var fVal = document.getElementById('f_' + key).value;
-  var hVal = document.getElementById('h_' + key).value;
-  var iVal = document.getElementById('i_' + key).value;
-  if (fVal === '' && hVal === '' && iVal === '') { showToast('値を入力してください'); return; }
+// ===== AUTO SAVE =====
+var autoSaveTimers = {};
+function autoSave(idx, key, fishName, field) {
+  // Hiện dot indicator
+  var dot = document.getElementById('dot_' + field + '_' + key);
+  if (dot) { dot.classList.add('show'); }
+  // Debounce 800ms
+  clearTimeout(autoSaveTimers[key]);
+  autoSaveTimers[key] = setTimeout(function() {
+    doSave(idx, key, fishName, false);
+  }, 800);
+}
 
-  var btn = document.getElementById('sbtn_' + key);
-  var msg = document.getElementById('msg_' + key);
-  btn.disabled = true; btn.textContent = '保存中...'; msg.textContent = '';
+async function doSave(idx, key, fishName, showMsg) {
+  var storeData = (sheetData[fishName] || [])[idx];
+  if (!storeData) return;
+  var fVal = document.getElementById('f_' + key) ? document.getElementById('f_' + key).value : '';
+  var hVal = document.getElementById('h_' + key) ? document.getElementById('h_' + key).value : '';
+  var iVal = document.getElementById('i_' + key) ? document.getElementById('i_' + key).value : '';
 
   try {
-    var payload = { action: 'write', sheetId: SHEET_ID, sheetName: document.getElementById('sheet-name-el').textContent,
-      row: storeData.row, f: fVal || null, h: hVal || null, i: iVal || null };
+    var payload = {
+      action: 'write', sheetId: SHEET_ID,
+      sheetName: document.getElementById('sheet-name-el').textContent,
+      row: storeData.row,
+      f: fVal || null, h: hVal || null, i: iVal || null
+    };
     var res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'text/plain' } });
     var json = await res.json();
     if (json.success) {
-      msg.textContent = '✓ 保存しました！'; msg.className = 'save-msg ok';
       storeData.qty = fVal; storeData.price = hVal; storeData.shiirePrice = iVal;
-      var row = document.getElementById('row_' + key);
-      var badge = document.getElementById('badge_' + key);
-      if (row) row.classList.add('filled');
-      if (badge) { badge.textContent = '✓ 入力済'; badge.className = 'store-badge badge-filled'; }
-      showToast(storeData.store + ' を保存 ✓');
-    } else {
-      msg.textContent = 'エラー: ' + (json.error || '不明'); msg.className = 'save-msg err';
+      // Tắt dot
+      ['f','h','i'].forEach(function(f) {
+        var dot = document.getElementById('dot_' + f + '_' + key);
+        if (dot) dot.classList.remove('show');
+      });
+      if (showMsg) {
+        var msg = document.getElementById('msg_' + key);
+        if (msg) { msg.textContent = '✓ 保存しました'; msg.className = 'save-msg ok'; }
+        var badge = document.getElementById('badge_' + key);
+        if (badge) { badge.textContent = '✓ 入力済'; badge.className = 'store-badge badge-filled'; }
+        var row = document.getElementById('row_' + key);
+        if (row) row.classList.add('filled');
+      }
     }
   } catch(e) {
-    msg.textContent = '通信エラー'; msg.className = 'save-msg err';
+    if (showMsg) {
+      var msg = document.getElementById('msg_' + key);
+      if (msg) { msg.textContent = '通信エラー'; msg.className = 'save-msg err'; }
+    }
   }
-  btn.disabled = false; btn.textContent = 'スプレッドシートに保存';
+}
+
+// ===== CONFIRM LOCK =====
+async function confirmLock(idx, key, fishName) {
+  await doSave(idx, key, fishName, true);
+  // Lock inputs
+  var area = document.getElementById('area_' + key);
+  if (area) {
+    area.querySelectorAll('input').forEach(function(inp) { inp.readOnly = true; inp.style.background = '#f1f8e9'; inp.style.color = '#555'; });
+  }
+  var row = document.getElementById('row_' + key);
+  if (row) row.classList.add('locked');
+  var sbtn = document.getElementById('sbtn_' + key);
+  if (sbtn) sbtn.style.display = 'none';
+  var ubtn = document.getElementById('ubtn_' + key);
+  if (ubtn) ubtn.style.display = 'block';
+  showToast('ロックしました ✓');
+}
+
+// ===== UNLOCK =====
+function unlock(key) {
+  var area = document.getElementById('area_' + key);
+  if (area) {
+    area.querySelectorAll('input').forEach(function(inp) { inp.readOnly = false; inp.style.background = ''; inp.style.color = ''; });
+  }
+  var row = document.getElementById('row_' + key);
+  if (row) row.classList.remove('locked');
+  var sbtn = document.getElementById('sbtn_' + key);
+  if (sbtn) sbtn.style.display = 'flex';
+  var ubtn = document.getElementById('ubtn_' + key);
+  if (ubtn) ubtn.style.display = 'none';
+  showToast('ロック解除しました');
+}
+
+// ===== LOCK ALL =====
+async function lockAll(fishName) {
+  var stores = sheetData[fishName] || [];
+  showLoading('全て保存・ロック中...');
+  for (var idx = 0; idx < stores.length; idx++) {
+    var key = makeKey(fishName, idx);
+    await confirmLock(idx, key, fishName);
+  }
+  hideLoading();
+  showToast(fishName + ' を全てロックしました ✓');
 }
 
 // ===== GROUP POPUP =====
