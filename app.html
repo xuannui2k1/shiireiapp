@@ -59,7 +59,8 @@ header p { font-size: 11px; opacity: 0.65; margin-top: 3px; }
 .store-badge { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px; }
 .badge-empty { background: #f0f0f0; color: #bbb; }
 .badge-filled { background: #e8f5e9; color: #2e7d32; }
-.store-input-area { border-top: 1px solid #eaeef4; padding: 14px; background: white; }
+.store-input-area { display: none; border-top: 1px solid #eaeef4; padding: 14px; background: white; }
+.fish-body.open .store-input-area { display: block; }
 .store-row.locked .store-input-area input { background: #f5f9f0; color: #777; pointer-events: none; }
 
 .input-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 12px; }
@@ -444,7 +445,9 @@ function renderFishCard(fishName, container) {
 }
 
 function toggleCard(header) {
-  var body = header.parentElement.querySelector('.fish-body');
+  var card = header.closest('.fish-card');
+  if (!card) card = header.parentElement;
+  var body = card.querySelector('.fish-body');
   var arrow = header.querySelector('.fish-arrow');
   if (!body) return;
   var isOpen = body.classList.toggle('open');
