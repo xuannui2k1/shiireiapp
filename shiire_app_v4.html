@@ -46,8 +46,8 @@ header p { font-size: 11px; opacity: 0.65; margin-top: 3px; }
 .fish-info .fish-summary { font-size: 12px; color: #aaa; margin-top: 3px; }
 .fish-arrow { font-size: 11px; color: #ccc; transition: transform 0.2s; }
 .fish-arrow.open { transform: rotate(180deg); color: #1a3a5c; }
-.fish-body { display: none; border-top: 1.5px solid #f4f6f9; }
-.fish-body.open { display: block; }
+.fish-body { display: none !important; border-top: 1.5px solid #f4f6f9; }
+.fish-body.open { display: block !important; }
 
 .store-list { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
 .store-row { background: #fafbfd; border: 1.5px solid #eaeef4; border-radius: 12px; overflow: hidden; transition: border-color 0.2s; }
@@ -59,7 +59,8 @@ header p { font-size: 11px; opacity: 0.65; margin-top: 3px; }
 .store-badge { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px; }
 .badge-empty { background: #f0f0f0; color: #bbb; }
 .badge-filled { background: #e8f5e9; color: #2e7d32; }
-.store-input-area { border-top: 1px solid #eaeef4; padding: 14px; background: white; }
+.store-input-area { display: none; border-top: 1px solid #eaeef4; padding: 14px; background: white; }
+.fish-body.open .store-input-area { display: block; }
 .store-row.locked .store-input-area input { background: #f5f9f0; color: #777; pointer-events: none; }
 
 .input-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 12px; }
@@ -418,6 +419,7 @@ function renderFishCard(fishName, container) {
               '<div class="field"><label>単価（H列）<span class="auto-save-dot" id="dot_h_' + key + '"></span></label><input type="number" id="h_' + key + '" inputmode="decimal" value="' + hVal + '" placeholder="0" oninput="autoSave(' + idx + ',\'' + key + '\',\'' + fn + '\',\'h\')"></div>' +
               '<div class="field"><label>仕入単価（I列）<span class="auto-save-dot" id="dot_i_' + key + '"></span></label><input type="number" id="i_' + key + '" inputmode="decimal" value="' + iVal + '" placeholder="0" oninput="autoSave(' + idx + ',\'' + key + '\',\'' + fn + '\',\'i\')"></div>' +
             '</div>' +
+            '<div class="btn-row">' +
               '<button class="btn-confirm" id="sbtn_' + key + '" onclick="confirmLock(' + idx + ',\'' + key + '\',\'' + fn + '\')">✓ 確認・ロック</button>' +
               '<button class="btn-unlock" id="ubtn_' + key + '" onclick="unlock(\'' + key + '\')" style="display:none;">🔓 解除</button>' +
             '</div>' +
@@ -444,7 +446,8 @@ function renderFishCard(fishName, container) {
 }
 
 function toggleCard(header) {
-  var body = header.parentElement.querySelector('.fish-body');
+  var card = header.closest ? header.closest('.fish-card') : header.parentElement;
+  var body = card.querySelector('.fish-body');
   var arrow = header.querySelector('.fish-arrow');
   if (!body) return;
   var isOpen = body.classList.toggle('open');
