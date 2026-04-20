@@ -294,7 +294,7 @@ async function loadSheetData() {
     // Load song song: dữ liệu sheet + danh sách cá master
     var [res1, res2] = await Promise.all([
       fetch(GAS_URL + '?action=readAll&sheetId=' + encodeURIComponent(SHEET_ID) + '&sheetName=' + encodeURIComponent(sheetName)),
-      fetch(GAS_URL + '?action=readMaster')
+      fetch(GAS_URL + '?action=readMaster&sheetId=' + encodeURIComponent(SHEET_ID))
     ]);
     var json1 = await res1.json();
     var json2 = await res2.json();
