@@ -876,6 +876,14 @@ function renderIchiran(searchQuery) {
 
   html += '</div>';
   el.innerHTML = html;
+  // Giữ focus vào ô tìm kiếm sau khi render
+  var inp = el.querySelector('input');
+  if (inp) {
+    inp.focus();
+    // Đặt con trỏ về cuối
+    var len = inp.value.length;
+    inp.setSelectionRange(len, len);
+  }
 }
 
 function toggleIchiran(sid) {
