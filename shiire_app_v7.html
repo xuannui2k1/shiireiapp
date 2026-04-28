@@ -836,29 +836,26 @@ function renderIchiran(searchQuery) {
   } else {
     stores.forEach(function(s) {
       var sid = 'sto_' + String(s.code) + '_' + s.store.replace(/[\s　]/g,'');
+      var comment = ichiranComments[String(s.code)] || '';
       html += '<div class="store-ichiran-card">' +
         '<div class="store-ichiran-header" onclick="toggleIchiran(\'' + sid + '\')">' +
           '<div>' +
             '<span class="store-ichiran-code">' + s.code + '</span>' +
             '<span class="store-ichiran-name">' + s.store + '</span>' +
-            (ichiranComments[String(s.code)] ? ' <span style="color:#2e7d32;font-size:13px;" title="コメントあり">✓</span>' : '') +
+            (comment ? ' <span style="background:#e8f5e9;color:#2e7d32;font-size:11px;font-weight:700;padding:2px 7px;border-radius:10px;margin-left:6px;">コメント有</span>' : '') +
             '<div class="store-ichiran-count">' + s.items.length + '件</div>' +
           '</div>' +
           '<span class="fish-arrow" id="arr_' + sid + '">&#9660;</span>' +
         '</div>' +
         '<div class="store-ichiran-body" id="bod_' + sid + '">' +
           '<table class="ichiran-table">' +
-            '<tr><th>商品名</th><th>注文数量</th><th>単位</th><th>コメント</th></tr>' +
+            '<tr><th>商品名</th><th>注文数量</th><th>単位</th></tr>' +
             s.items.map(function(item) {
               var hl = ichiranSearch && item.name.toLowerCase().indexOf(ichiranSearch) !== -1 ? ' class="highlight"' : '';
-              var commentKey = String(parseInt(item.code));
-              var comment = ichiranComments[commentKey] || '';
-              // Chỉ hiện comment 1 lần ở dòng đầu tiên của cửa hàng
-              var isFirstItem = s.items.indexOf(item) === 0;
-              return '<tr' + hl + '><td>' + item.name + '</td><td>' + (item.orderQty || '') + '</td><td>' + (item.unit || '') + '</td>' +
-                '<td style="color:#e65100;font-size:12px;">' + (isFirstItem ? comment : '') + '</td></tr>';
+              return '<tr' + hl + '><td>' + item.name + '</td><td>' + (item.orderQty || '') + '</td><td>' + (item.unit || '') + '</td></tr>';
             }).join('') +
           '</table>' +
+          (comment ? '<div style="padding:10px 14px;background:#fff8e1;border-top:1px solid #f0e0a0;font-size:13px;color:#e65100;font-weight:600;">📝 ' + comment + '</div>' : '') +
         '</div>' +
       '</div>';
     });
