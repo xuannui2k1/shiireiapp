@@ -809,14 +809,27 @@ function renderIchiran(searchQuery) {
   var el = document.getElementById('ichiran-screen-el');
   if (!ichiranData) return;
 
+  // Dùng logic tìm kiếm romaji/hiragana
+  var qHira = romajiToHiragana(ichiranSearch);
+  var qKata = ichiranSearch.replace(/[\u3041-\u3096]/g, function(c) {
+    return String.fromCharCode(c.charCodeAt(0) + 0x60);
+  });
+
+  function matchSearch(text) {
+    if (!ichiranSearch) return true;
+    var t = text.toLowerCase();
+    var tHira = toHiragana(t);
+    return t.indexOf(ichiranSearch) !== -1 ||
+           tHira.indexOf(qHira) !== -1 ||
+           t.indexOf(qKata) !== -1 ||
+           toHiragana(text).indexOf(ichiranSearch) !== -1;
+  }
   // Group by store
   var storeMap = {};
   ichiranData.forEach(function(row) {
     var key = String(row.code) + '_' + row.store;
     if (!storeMap[key]) storeMap[key] = { code: row.code, store: row.store, items: [] };
-    if (!ichiranSearch ||
-        row.name.toLowerCase().indexOf(ichiranSearch) !== -1 ||
-        row.store.toLowerCase().indexOf(ichiranSearch) !== -1) {
+    if (!ichiranSearch || matchSearch(row.name) || matchSearch(row.store)) {
       storeMap[key].items.push(row);
     }
   });
@@ -851,7 +864,7 @@ function renderIchiran(searchQuery) {
           '<table class="ichiran-table">' +
             '<tr><th>商品名</th><th>注文数量</th><th>単位</th></tr>' +
             s.items.map(function(item) {
-              var hl = ichiranSearch && item.name.toLowerCase().indexOf(ichiranSearch) !== -1 ? ' class="highlight"' : '';
+              var hl = ichiranSearch && matchSearch(item.name) ? ' class="highlight"' : '';
               return '<tr' + hl + '><td>' + item.name + '</td><td>' + (item.orderQty || '') + '</td><td>' + (item.unit || '') + '</td></tr>';
             }).join('') +
           '</table>' +
