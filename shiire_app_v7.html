@@ -129,6 +129,28 @@ header p { font-size: 11px; opacity: 0.65; margin-top: 3px; }
 .popup-fish-item .pf-info { font-size: 11px; color: #bbb; margin-top: 3px; }
 .btn-cancel { width: 100%; margin-top: 10px; padding: 13px; background: #f4f6f9; border: none; border-radius: 12px; font-size: 14px; font-weight: 700; font-family: inherit; cursor: pointer; color: #888; }
 .btn-cancel:active { background: #eaeef4; }
+
+/* 一覧タブ */
+.ichiran-screen { padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.ichiran-search-box { background: white; border-radius: 14px; border: 1.5px solid #eaeef4; padding: 14px; }
+.ichiran-search-box input { width: 100%; border: 1.5px solid #eaeef4; border-radius: 10px; padding: 11px 14px; font-size: 15px; font-family: inherit; background: #fafbfd; }
+.ichiran-search-box input:focus { outline: none; border-color: #1a3a5c; }
+.store-ichiran-card { background: white; border-radius: 14px; border: 1.5px solid #eaeef4; overflow: hidden; }
+.store-ichiran-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; cursor: pointer; user-select: none; }
+.store-ichiran-header:active { background: #f4f6f9; }
+.store-ichiran-code { font-size: 12px; color: #aaa; font-weight: 700; margin-right: 8px; }
+.store-ichiran-name { font-size: 16px; font-weight: 700; color: #1a1a1a; }
+.store-ichiran-count { font-size: 12px; color: #aaa; margin-top: 2px; }
+.store-ichiran-body { display: none; border-top: 1.5px solid #f4f6f9; }
+.store-ichiran-body.open { display: block; }
+.ichiran-table { width: 100%; border-collapse: collapse; }
+.ichiran-table th { background: #f4f6f9; padding: 8px 12px; font-size: 11px; color: #888; font-weight: 700; text-align: left; border-bottom: 1px solid #eaeef4; }
+.ichiran-table td { padding: 9px 12px; font-size: 13px; border-bottom: 1px solid #f4f6f9; color: #1a1a1a; }
+.ichiran-table tr:last-child td { border-bottom: none; }
+.ichiran-table tr.highlight td { background: #fff8e1; }
+.no-result { text-align: center; padding: 20px; color: #bbb; font-size: 13px; }
+.tab-btn.tab-ichiran { color: #6a1b9a; }
+.tab-btn.tab-ichiran.active { color: #6a1b9a; border-bottom-color: #6a1b9a; }
 </style>
 </head>
 <body>
@@ -165,6 +187,7 @@ header p { font-size: 11px; opacity: 0.65; margin-top: 3px; }
   <div class="tabs" id="tabs-el"></div>
   <div class="fish-list" id="fish-list-el" style="display:flex;"></div>
   <div id="add-screen-el" style="display:none;"></div>
+  <div id="ichiran-screen-el" style="display:none;"></div>
   <div class="settings-link"><a onclick="showSetup()">&#9881; 設定を変更する</a></div>
 </div>
 
@@ -184,7 +207,8 @@ var CATEGORIES = [
   { id: 'e',    label: 'え', prefix: 'え）', items: ['え）マグロ'] },
   { id: 'tachi',label: '立', prefix: '立）', items: ['立）ヒラマサ'] },
   { id: 'waka', label: '若', prefix: '若）', items: ['若）天然タイ'] },
-  { id: 'add',  label: '魚追加', prefix: null, items: [] }
+  { id: 'add',  label: '魚追加', prefix: null, items: [] },
+  { id: 'ichiran', label: '一覧', prefix: null, items: [] }
 ];
 
 var ALL_FISH_NAMES = [
@@ -258,7 +282,8 @@ function buildTabs() {
   el.innerHTML = '';
   CATEGORIES.forEach(function(cat) {
     var btn = document.createElement('button');
-    btn.className = 'tab-btn' + (cat.id === currentTab ? ' active' : '') + (cat.id === 'add' ? ' tab-add' : '');
+    var extraClass = cat.id === 'add' ? ' tab-add' : cat.id === 'ichiran' ? ' tab-ichiran' : '';
+    btn.className = 'tab-btn' + extraClass + (cat.id === currentTab ? ' active' : '');
     btn.textContent = cat.label;
     btn.onclick = function() { switchTab(cat.id); };
     el.appendChild(btn);
@@ -270,13 +295,21 @@ function switchTab(id) {
   document.querySelectorAll('.tab-btn').forEach(function(b, i) {
     b.classList.toggle('active', CATEGORIES[i].id === id);
   });
+  document.getElementById('fish-list-el').style.display = 'none';
+  document.getElementById('add-screen-el').style.display = 'none';
+  document.getElementById('ichiran-screen-el').style.display = 'none';
+
   if (id === 'add') {
-    document.getElementById('fish-list-el').style.display = 'none';
     document.getElementById('add-screen-el').style.display = 'block';
     renderAddScreen();
+  } else if (id === 'ichiran') {
+    document.getElementById('ichiran-screen-el').style.display = 'block';
+    // Lazy load: chỉ tải khi click vào
+    if (!document.getElementById('ichiran-screen-el').dataset.loaded) {
+      loadIchiranData();
+    }
   } else {
     document.getElementById('fish-list-el').style.display = 'flex';
-    document.getElementById('add-screen-el').style.display = 'none';
     if (document.getElementById('fish-list-el').dataset.renderedTab !== id) {
       renderList();
       document.getElementById('fish-list-el').dataset.renderedTab = id;
@@ -372,8 +405,15 @@ function renderList() {
   if (!cat || !cat.prefix) return;
 
   var displayItems = cat.items.concat(extraItems[cat.id] || []);
+  var rendered = {};
   displayItems.forEach(function(fishName) {
-    renderFishCard(fishName, container);
+    // Nếu là アナゴ（活）gốc → render nhóm gộp tất cả variants
+    if (fishName === '丸）アナゴ（活）') {
+      renderAnagoGroup(container);
+      rendered['anago'] = true;
+    } else {
+      renderFishCard(fishName, container);
+    }
   });
 
   var addBtn = document.createElement('div');
@@ -385,8 +425,89 @@ function renderList() {
   container.appendChild(addBtn);
 }
 
+function renderAnagoGroup(container) {
+  // Tìm tất cả アナゴ（活）variants từ sheetData
+  var variants = Object.keys(sheetData).filter(function(name) {
+    return name.indexOf('アナゴ（活）') !== -1 || name.indexOf('丸）アナゴ') !== -1;
+  });
+  if (variants.length === 0) {
+    // Không có trong sheet → hiện card trống
+    renderFishCard('丸）アナゴ（活）', container);
+    return;
+  }
+
+  // Gộp tất cả stores từ các variants, sắp xếp theo code
+  var allStoreItems = [];
+  variants.forEach(function(variantName) {
+    var stores = sheetData[variantName] || [];
+    stores.forEach(function(s) {
+      allStoreItems.push({ store: s, fishName: variantName });
+    });
+  });
+  allStoreItems.sort(function(a, b) { return Number(a.store.code) - Number(b.store.code); });
+
+  // Build card
+  var filledCount = allStoreItems.filter(function(si) { return si.store.qty !== null && si.store.qty !== ''; }).length;
+  var hasFilled = filledCount > 0;
+  var card = document.createElement('div');
+  card.className = 'fish-card' + (hasFilled ? ' has-filled' : '');
+
+  var summary = allStoreItems.length + '店舗 / ' + filledCount + '件入力済';
+  var storesHTML = '<div class="store-list">';
+
+  allStoreItems.forEach(function(si, idx) {
+    var s = si.store;
+    var fishName = si.fishName;
+    var fn = fishName.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    var isFilled = s.qty !== null && s.qty !== '';
+    var fVal = s.qty !== null ? s.qty : '';
+    var hVal = s.price !== null ? s.price : '';
+    var iVal = s.shiirePrice !== null ? s.shiirePrice : '';
+    var key = makeKey(fishName + '_anago', idx);
+
+    storesHTML +=
+      '<div class="store-row' + (isFilled ? ' filled' : '') + '" id="row_' + key + '">' +
+        '<div class="store-header">' +
+          '<div>' +
+            '<span class="store-name-text">' + s.code + ' ' + s.store + '</span>' +
+            '<div style="font-size:11px;color:#aaa;margin-top:2px;">' + fishName + '</div>' +
+          '</div>' +
+          '<span class="store-badge ' + (isFilled ? 'badge-filled' : 'badge-empty') + '" id="badge_' + key + '">' + (isFilled ? '✓ 入力済' : '未入力') + '</span>' +
+        '</div>' +
+        '<div class="store-input-area" id="area_' + key + '">' +
+          '<div class="input-grid">' +
+            '<div class="field"><label>数量（F列）<span class="auto-save-dot" id="dot_f_' + key + '"></span></label><input type="number" id="f_' + key + '" inputmode="decimal" value="' + fVal + '" placeholder="0" oninput="autoSave(' + s.row + ',\'' + key + '\',\'' + fn + '\',\'f\',true)"></div>' +
+            '<div class="field"><label>単価（H列）<span class="auto-save-dot" id="dot_h_' + key + '"></span></label><input type="number" id="h_' + key + '" inputmode="decimal" value="' + hVal + '" placeholder="0" oninput="autoSave(' + s.row + ',\'' + key + '\',\'' + fn + '\',\'h\',true)"></div>' +
+            '<div class="field"><label>仕入単価（I列）<span class="auto-save-dot" id="dot_i_' + key + '"></span></label><input type="number" id="i_' + key + '" inputmode="decimal" value="' + iVal + '" placeholder="0" oninput="autoSave(' + s.row + ',\'' + key + '\',\'' + fn + '\',\'i\',true)"></div>' +
+          '</div>' +
+          '<div class="btn-row">' +
+            '<button class="btn-confirm" id="sbtn_' + key + '" onclick="confirmLockByRow(' + s.row + ',\'' + key + '\',\'' + fn + '\')">✓ 確認・ロック</button>' +
+            '<button class="btn-unlock" id="ubtn_' + key + '" onclick="unlock(\'' + key + '\')" style="display:none;">🔓 解除</button>' +
+          '</div>' +
+          '<div class="save-msg" id="msg_' + key + '"></div>' +
+        '</div>' +
+      '</div>';
+  });
+
+  storesHTML += '</div>';
+
+  card.innerHTML =
+    '<div class="fish-header" onclick="toggleCard(this)">' +
+      '<div class="fish-info">' +
+        '<div class="fish-name">丸）アナゴ（活）</div>' +
+        '<div class="fish-summary">' + summary + '</div>' +
+      '</div>' +
+      '<span class="fish-arrow">&#9660;</span>' +
+    '</div>' +
+    '<div class="fish-body">' + storesHTML + '</div>';
+
+  container.appendChild(card);
+}
+
 function renderFishCard(fishName, container) {
-  var stores = sheetData[fishName] || [];
+  var stores = (sheetData[fishName] || []).slice().sort(function(a, b) {
+    return Number(a.code) - Number(b.code);
+  });
   var filledCount = stores.filter(function(s) { return s.qty !== null && s.qty !== ''; }).length;
   var hasFilled = filledCount > 0;
   var fn = fishName.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
@@ -461,15 +582,77 @@ function toggleStoreArea(key) {
 
 // ===== AUTO SAVE =====
 var autoSaveTimers = {};
-function autoSave(idx, key, fishName, field) {
-  // Hiện dot indicator
+function autoSave(idxOrRow, key, fishName, field, useRow) {
   var dot = document.getElementById('dot_' + field + '_' + key);
-  if (dot) { dot.classList.add('show'); }
-  // Debounce 800ms
+  if (dot) dot.classList.add('show');
   clearTimeout(autoSaveTimers[key]);
   autoSaveTimers[key] = setTimeout(function() {
-    doSave(idx, key, fishName, false);
+    doSave(idxOrRow, key, fishName, false, useRow);
   }, 800);
+}
+
+async function doSave(idxOrRow, key, fishName, showMsg, useRow) {
+  var row;
+  if (useRow) {
+    row = idxOrRow;
+  } else {
+    var storeData = (sheetData[fishName] || [])[idxOrRow];
+    if (!storeData) return;
+    row = storeData.row;
+  }
+  var fEl = document.getElementById('f_' + key);
+  var hEl = document.getElementById('h_' + key);
+  var iEl = document.getElementById('i_' + key);
+  var fVal = fEl ? fEl.value : '';
+  var hVal = hEl ? hEl.value : '';
+  var iVal = iEl ? iEl.value : '';
+
+  try {
+    var payload = {
+      action: 'write', sheetId: SHEET_ID,
+      sheetName: document.getElementById('sheet-name-el').textContent,
+      row: row,
+      f: fVal || null, h: hVal || null, i: iVal || null
+    };
+    var res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'text/plain' } });
+    var json = await res.json();
+    if (json.success) {
+      if (!useRow && sheetData[fishName]) {
+        var sd = sheetData[fishName][idxOrRow];
+        if (sd) { sd.qty = fVal; sd.price = hVal; sd.shiirePrice = iVal; }
+      }
+      ['f','h','i'].forEach(function(f) {
+        var dot = document.getElementById('dot_' + f + '_' + key);
+        if (dot) dot.classList.remove('show');
+      });
+      if (showMsg) {
+        var msg = document.getElementById('msg_' + key);
+        if (msg) { msg.textContent = '✓ 保存しました'; msg.className = 'save-msg ok'; }
+        var badge = document.getElementById('badge_' + key);
+        if (badge) { badge.textContent = '✓ 入力済'; badge.className = 'store-badge badge-filled'; }
+        var rowEl = document.getElementById('row_' + key);
+        if (rowEl) rowEl.classList.add('filled');
+      }
+    }
+  } catch(e) {
+    if (showMsg) {
+      var msg = document.getElementById('msg_' + key);
+      if (msg) { msg.textContent = '通信エラー'; msg.className = 'save-msg err'; }
+    }
+  }
+}
+
+async function confirmLockByRow(row, key, fishName) {
+  await doSave(row, key, fishName, true, true);
+  var area = document.getElementById('area_' + key);
+  if (area) area.querySelectorAll('input').forEach(function(inp) { inp.readOnly = true; inp.style.background = '#f1f8e9'; inp.style.color = '#555'; });
+  var rowEl = document.getElementById('row_' + key);
+  if (rowEl) rowEl.classList.add('locked');
+  var sbtn = document.getElementById('sbtn_' + key);
+  if (sbtn) sbtn.style.display = 'none';
+  var ubtn = document.getElementById('ubtn_' + key);
+  if (ubtn) ubtn.style.display = 'block';
+  showToast('ロックしました ✓');
 }
 
 async function doSave(idx, key, fishName, showMsg) {
@@ -598,7 +781,100 @@ function openGroupPopup(catId, prefix, label) {
   document.body.appendChild(overlay);
 }
 
-// ===== FIXED STORES cho tab 魚追加 =====
+// ===== 一覧タブ =====
+var ichiranData = null;
+var ichiranComments = {};
+var ichiranSearch = '';
+
+async function loadIchiranData() {
+  var el = document.getElementById('ichiran-screen-el');
+  el.innerHTML = '<div class="ichiran-screen"><div class="no-result">読み込み中...</div></div>';
+  var sheetName = document.getElementById('sheet-name-el').textContent;
+  try {
+    var url = GAS_URL + '?action=readIchiran&sheetId=' + encodeURIComponent(SHEET_ID) + '&sheetName=' + encodeURIComponent(sheetName);
+    var res = await fetch(url);
+    var json = await res.json();
+    if (json.error) { el.innerHTML = '<div class="ichiran-screen"><div class="no-result">エラー: ' + json.error + '</div></div>'; return; }
+    ichiranData = json.rows || [];
+    ichiranComments = json.comments || {};
+    el.dataset.loaded = '1';
+    renderIchiran('');
+  } catch(e) {
+    el.innerHTML = '<div class="ichiran-screen"><div class="no-result">通信エラー</div></div>';
+  }
+}
+
+function renderIchiran(searchQuery) {
+  ichiranSearch = (searchQuery || '').toLowerCase();
+  var el = document.getElementById('ichiran-screen-el');
+  if (!ichiranData) return;
+
+  // Group by store
+  var storeMap = {};
+  ichiranData.forEach(function(row) {
+    var key = String(row.code) + '_' + row.store;
+    if (!storeMap[key]) storeMap[key] = { code: row.code, store: row.store, items: [] };
+    if (!ichiranSearch ||
+        row.name.toLowerCase().indexOf(ichiranSearch) !== -1 ||
+        row.store.toLowerCase().indexOf(ichiranSearch) !== -1) {
+      storeMap[key].items.push(row);
+    }
+  });
+
+  var stores = Object.values(storeMap)
+    .filter(function(s) { return s.items.length > 0; })
+    .sort(function(a, b) { return Number(a.code) - Number(b.code); });
+
+  var html = '<div class="ichiran-screen">';
+  html += '<div class="ichiran-search-box">' +
+    '<input type="text" placeholder="商品名・店舗名で検索..." value="' + (ichiranSearch || '') + '" ' +
+    'oninput="renderIchiran(this.value)">' +
+    '</div>';
+
+  if (stores.length === 0) {
+    html += '<div class="no-result">該当する商品が見つかりません</div>';
+  } else {
+    stores.forEach(function(s) {
+      var sid = 'sto_' + String(s.code) + '_' + s.store.replace(/[\s　]/g,'');
+      html += '<div class="store-ichiran-card">' +
+        '<div class="store-ichiran-header" onclick="toggleIchiran(\'' + sid + '\')">' +
+          '<div>' +
+            '<span class="store-ichiran-code">' + s.code + '</span>' +
+            '<span class="store-ichiran-name">' + s.store + '</span>' +
+            (ichiranComments[String(s.code)] ? ' <span style="color:#2e7d32;font-size:13px;" title="コメントあり">✓</span>' : '') +
+            '<div class="store-ichiran-count">' + s.items.length + '件</div>' +
+          '</div>' +
+          '<span class="fish-arrow" id="arr_' + sid + '">&#9660;</span>' +
+        '</div>' +
+        '<div class="store-ichiran-body" id="bod_' + sid + '">' +
+          '<table class="ichiran-table">' +
+            '<tr><th>商品名</th><th>注文数量</th><th>単位</th><th>コメント</th></tr>' +
+            s.items.map(function(item) {
+              var hl = ichiranSearch && item.name.toLowerCase().indexOf(ichiranSearch) !== -1 ? ' class="highlight"' : '';
+              var commentKey = String(parseInt(item.code));
+              var comment = ichiranComments[commentKey] || '';
+              // Chỉ hiện comment 1 lần ở dòng đầu tiên của cửa hàng
+              var isFirstItem = s.items.indexOf(item) === 0;
+              return '<tr' + hl + '><td>' + item.name + '</td><td>' + (item.orderQty || '') + '</td><td>' + (item.unit || '') + '</td>' +
+                '<td style="color:#e65100;font-size:12px;">' + (isFirstItem ? comment : '') + '</td></tr>';
+            }).join('') +
+          '</table>' +
+        '</div>' +
+      '</div>';
+    });
+  }
+
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+function toggleIchiran(sid) {
+  var body = document.getElementById('bod_' + sid);
+  var arrow = document.getElementById('arr_' + sid);
+  if (!body) return;
+  var isOpen = body.classList.toggle('open');
+  if (arrow) arrow.classList.toggle('open', isOpen);
+}
 var FIXED_STORES = [
   { code: 2,  store: '大晴海' },
   { code: 3,  store: '海の路' },
