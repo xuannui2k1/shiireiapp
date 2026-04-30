@@ -744,7 +744,11 @@ function openGroupPopup(catId, prefix, label) {
   var cat = CATEGORIES.find(function(c) { return c.id === catId; });
   var shown = cat.items.concat(extraItems[catId] || []);
   var available = Object.keys(sheetData).filter(function(name) {
-    return name.startsWith(prefix) && shown.indexOf(name) === -1;
+    if (!name.startsWith(prefix)) return false;
+    if (shown.indexOf(name) !== -1) return false;
+    // Lọc bỏ アナゴ（活）variants vì đã gộp vào nhóm riêng
+    if (catId === 'maru' && name.indexOf('アナゴ（活）') !== -1) return false;
+    return true;
   }).sort();
 
   if (available.length === 0) { showToast('追加できる魚がシートにありません'); return; }
@@ -840,8 +844,10 @@ function renderIchiran(searchQuery) {
 
   var html = '<div class="ichiran-screen">';
   html += '<div class="ichiran-search-box">' +
-    '<input type="text" placeholder="商品名・店舗名で検索..." value="' + (ichiranSearch || '') + '" ' +
-    'oninput="renderIchiran(this.value)">' +
+    '<input type="text" id="ichiran-search-input" placeholder="商品名・店舗名で検索..." value="' + (ichiranSearch || '') + '" ' +
+    'oninput="if(!this._composing)renderIchiran(this.value)" ' +
+    'oncompositionstart="this._composing=true" ' +
+    'oncompositionend="this._composing=false;renderIchiran(this.value)">' +
     '</div>';
 
   if (stores.length === 0) {
