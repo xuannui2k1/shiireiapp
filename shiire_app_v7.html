@@ -617,7 +617,15 @@ async function doSave(idxOrRow, key, fishName, showMsg, useRow) {
     var res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'text/plain' } });
     var json = await res.json();
     if (json.success) {
-      if (!useRow && sheetData[fishName]) {
+      // Cập nhật sheetData
+      if (useRow) {
+        // Tìm trong tất cả variants của sheetData theo row number
+        Object.keys(sheetData).forEach(function(name) {
+          sheetData[name].forEach(function(sd) {
+            if (sd.row === row) { sd.qty = fVal; sd.price = hVal; sd.shiirePrice = iVal; }
+          });
+        });
+      } else if (sheetData[fishName]) {
         var sd = sheetData[fishName][idxOrRow];
         if (sd) { sd.qty = fVal; sd.price = hVal; sd.shiirePrice = iVal; }
       }
@@ -653,46 +661,6 @@ async function confirmLockByRow(row, key, fishName) {
   var ubtn = document.getElementById('ubtn_' + key);
   if (ubtn) ubtn.style.display = 'block';
   showToast('ロックしました ✓');
-}
-
-async function doSave(idx, key, fishName, showMsg) {
-  var storeData = (sheetData[fishName] || [])[idx];
-  if (!storeData) return;
-  var fVal = document.getElementById('f_' + key) ? document.getElementById('f_' + key).value : '';
-  var hVal = document.getElementById('h_' + key) ? document.getElementById('h_' + key).value : '';
-  var iVal = document.getElementById('i_' + key) ? document.getElementById('i_' + key).value : '';
-
-  try {
-    var payload = {
-      action: 'write', sheetId: SHEET_ID,
-      sheetName: document.getElementById('sheet-name-el').textContent,
-      row: storeData.row,
-      f: fVal || null, h: hVal || null, i: iVal || null
-    };
-    var res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'text/plain' } });
-    var json = await res.json();
-    if (json.success) {
-      storeData.qty = fVal; storeData.price = hVal; storeData.shiirePrice = iVal;
-      // Tắt dot
-      ['f','h','i'].forEach(function(f) {
-        var dot = document.getElementById('dot_' + f + '_' + key);
-        if (dot) dot.classList.remove('show');
-      });
-      if (showMsg) {
-        var msg = document.getElementById('msg_' + key);
-        if (msg) { msg.textContent = '✓ 保存しました'; msg.className = 'save-msg ok'; }
-        var badge = document.getElementById('badge_' + key);
-        if (badge) { badge.textContent = '✓ 入力済'; badge.className = 'store-badge badge-filled'; }
-        var row = document.getElementById('row_' + key);
-        if (row) row.classList.add('filled');
-      }
-    }
-  } catch(e) {
-    if (showMsg) {
-      var msg = document.getElementById('msg_' + key);
-      if (msg) { msg.textContent = '通信エラー'; msg.className = 'save-msg err'; }
-    }
-  }
 }
 
 // ===== CONFIRM LOCK =====
