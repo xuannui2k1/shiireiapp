@@ -796,6 +796,24 @@ function renderIchiran(searchQuery) {
            t.indexOf(qKata) !== -1 ||
            toHiragana(text).indexOf(ichiranSearch) !== -1;
   }
+  // Nếu screen chưa có search box thì tạo lần đầu
+  var el = document.getElementById('ichiran-screen-el');
+  if (!el.querySelector('.ichiran-search-box')) {
+    el.innerHTML = '<div class="ichiran-screen">' +
+      '<div class="ichiran-search-box">' +
+        '<input type="text" id="ichiran-search-input" placeholder="商品名・店舗名で検索..." ' +
+        'oninput="if(!this._composing)renderIchiran(this.value)" ' +
+        'oncompositionstart="this._composing=true" ' +
+        'oncompositionend="this._composing=false;renderIchiran(this.value)">' +
+      '</div>' +
+      '<div id="ichiran-results"></div>' +
+    '</div>';
+  }
+
+  // Chỉ cập nhật phần kết quả
+  var resultsEl = document.getElementById('ichiran-results');
+  if (!resultsEl) return;
+
   // Group by store
   var storeMap = {};
   ichiranData.forEach(function(row) {
@@ -810,13 +828,7 @@ function renderIchiran(searchQuery) {
     .filter(function(s) { return s.items.length > 0; })
     .sort(function(a, b) { return Number(a.code) - Number(b.code); });
 
-  var html = '<div class="ichiran-screen">';
-  html += '<div class="ichiran-search-box">' +
-    '<input type="text" id="ichiran-search-input" placeholder="商品名・店舗名で検索..." value="' + (ichiranSearch || '') + '" ' +
-    'oninput="if(!this._composing)renderIchiran(this.value)" ' +
-    'oncompositionstart="this._composing=true" ' +
-    'oncompositionend="this._composing=false;renderIchiran(this.value)">' +
-    '</div>';
+  var html = '';
 
   if (stores.length === 0) {
     html += '<div class="no-result">該当する商品が見つかりません</div>';
@@ -848,16 +860,7 @@ function renderIchiran(searchQuery) {
     });
   }
 
-  html += '</div>';
-  el.innerHTML = html;
-  // Giữ focus vào ô tìm kiếm sau khi render
-  var inp = el.querySelector('input');
-  if (inp) {
-    inp.focus();
-    // Đặt con trỏ về cuối
-    var len = inp.value.length;
-    inp.setSelectionRange(len, len);
-  }
+  resultsEl.innerHTML = html;
 }
 
 function toggleIchiran(sid) {
