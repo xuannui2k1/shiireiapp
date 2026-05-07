@@ -201,7 +201,7 @@ header p { font-size: 11px; opacity: 0.65; margin-top: 3px; }
 
 <script>
 var CATEGORIES = [
-  { id: 'maru', label: '丸', prefix: '丸）', items: ['丸）カツオ','丸）アナゴ（活）','丸）タコ（活）'] },
+  { id: 'maru', label: '丸', prefix: '丸）', items: ['丸）カツオ','丸）イサキ','丸）アナゴ（活）','丸）タコ（活）'] },
   { id: 'naka', label: '中', prefix: '中）', items: ['中）ホタルイカ','中）殻付きホタテ'] },
   { id: 'ki',   label: '貴', prefix: '貴）', items: ['貴）サワラ','貴）キンメダイ','貴）サヨリ','貴）サゴシ'] },
   { id: 'e',    label: 'え', prefix: 'え）', items: ['え）マグロ'] },
@@ -407,10 +407,12 @@ function renderList() {
   var displayItems = cat.items.concat(extraItems[cat.id] || []);
   var rendered = {};
   displayItems.forEach(function(fishName) {
-    // Nếu là アナゴ（活）gốc → render nhóm gộp tất cả variants
     if (fishName === '丸）アナゴ（活）') {
-      renderAnagoGroup(container);
-      rendered['anago'] = true;
+      renderGroupedFishCard('丸）アナゴ（活）', 'アナゴ（活）', container);
+    } else if (fishName === '丸）カツオ') {
+      renderGroupedFishCard('丸）カツオ', 'カツオ', container);
+    } else if (fishName === '丸）イサキ') {
+      renderGroupedFishCard('丸）イサキ', 'イサキ', container);
     } else {
       renderFishCard(fishName, container);
     }
@@ -425,33 +427,28 @@ function renderList() {
   container.appendChild(addBtn);
 }
 
-function renderAnagoGroup(container) {
-  // Tìm tất cả アナゴ（活）variants từ sheetData
+function renderGroupedFishCard(baseName, keyword, container) {
+  // Tìm tất cả variants chứa keyword từ sheetData
   var variants = Object.keys(sheetData).filter(function(name) {
-    return name.indexOf('アナゴ（活）') !== -1 || name.indexOf('丸）アナゴ') !== -1;
+    return name.indexOf(keyword) !== -1;
   });
   if (variants.length === 0) {
-    // Không có trong sheet → hiện card trống
-    renderFishCard('丸）アナゴ（活）', container);
+    renderFishCard(baseName, container);
     return;
   }
 
   // Gộp tất cả stores từ các variants, sắp xếp theo code
   var allStoreItems = [];
   variants.forEach(function(variantName) {
-    var stores = sheetData[variantName] || [];
-    stores.forEach(function(s) {
+    (sheetData[variantName] || []).forEach(function(s) {
       allStoreItems.push({ store: s, fishName: variantName });
     });
   });
   allStoreItems.sort(function(a, b) { return Number(a.store.code) - Number(b.store.code); });
 
-  // Build card
   var filledCount = allStoreItems.filter(function(si) { return si.store.qty !== null && si.store.qty !== ''; }).length;
-  var hasFilled = filledCount > 0;
   var card = document.createElement('div');
-  card.className = 'fish-card' + (hasFilled ? ' has-filled' : '');
-
+  card.className = 'fish-card' + (filledCount > 0 ? ' has-filled' : '');
   var summary = allStoreItems.length + '店舗 / ' + filledCount + '件入力済';
   var storesHTML = '<div class="store-list">';
 
@@ -463,7 +460,7 @@ function renderAnagoGroup(container) {
     var fVal = s.qty !== null ? s.qty : '';
     var hVal = s.price !== null ? s.price : '';
     var iVal = s.shiirePrice !== null ? s.shiirePrice : '';
-    var key = makeKey(fishName + '_anago', idx);
+    var key = makeKey(fishName + '_grp', idx);
 
     storesHTML +=
       '<div class="store-row' + (isFilled ? ' filled' : '') + '" id="row_' + key + '">' +
@@ -490,11 +487,10 @@ function renderAnagoGroup(container) {
   });
 
   storesHTML += '</div>';
-
   card.innerHTML =
     '<div class="fish-header" onclick="toggleCard(this)">' +
       '<div class="fish-info">' +
-        '<div class="fish-name">丸）アナゴ（活）</div>' +
+        '<div class="fish-name">' + baseName + '</div>' +
         '<div class="fish-summary">' + summary + '</div>' +
       '</div>' +
       '<span class="fish-arrow">&#9660;</span>' +
@@ -714,8 +710,12 @@ function openGroupPopup(catId, prefix, label) {
   var available = Object.keys(sheetData).filter(function(name) {
     if (!name.startsWith(prefix)) return false;
     if (shown.indexOf(name) !== -1) return false;
-    // Lọc bỏ アナゴ（活）variants vì đã gộp vào nhóm riêng
-    if (catId === 'maru' && name.indexOf('アナゴ（活）') !== -1) return false;
+    // Lọc bỏ variants đã được gộp vào nhóm riêng
+    if (catId === 'maru') {
+      if (name.indexOf('アナゴ（活）') !== -1) return false;
+      if (name.indexOf('カツオ') !== -1 && name !== '丸）カツオ') return false;
+      if (name.indexOf('イサキ') !== -1 && name !== '丸）イサキ') return false;
+    }
     return true;
   }).sort();
 
